@@ -146,7 +146,7 @@ func run() error {
 
 		crossBox := ui.NewVerticalBox()
 		crossBox.Append(ui.NewLabel(""), true)
-		crossBox.Append(ui.NewLabel("╳"), false)
+		crossBox.Append(ui.NewLabel("×"), false)
 		crossBox.Append(ui.NewLabel(""), true)
 		calcBox.Append(crossBox, false)
 
