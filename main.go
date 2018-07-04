@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/shibukawa/configdir"
+
 	"github.com/andlabs/ui"
 )
 
@@ -20,28 +22,23 @@ func main() {
 	}
 }
 
-// type inputFields struct {
-// 	inputFolder  string
-// 	outputFolder string
-// 	inputBPM     float64
-// 	outputBPM    float64
-// }
+var configDirs = configdir.New("", "meter-saber")
 
 func run() error {
-	cliInputs := parseFlags()
+	cliInputs := getInput()
 
 	err := ui.Main(func() {
 		window := ui.NewWindow("MeterSaber", 1200, 100, false)
 
 		inputSongInfoEntry := ui.NewEntry()
-		if cliInputs.inputFolder != "" {
-			inputSongInfoEntry.SetText(filepath.Join(cliInputs.inputFolder, "info.json"))
+		if cliInputs.InputFolder != "" {
+			inputSongInfoEntry.SetText(filepath.Join(cliInputs.InputFolder, "info.json"))
 		}
 
 		inputSongInfoButton := ui.NewButton("Browse")
 
 		outputFolderEntry := ui.NewEntry()
-		outputFolderEntry.SetText(cliInputs.outputFolder)
+		outputFolderEntry.SetText(cliInputs.OutputFolder)
 		canOverrideOutputFolder := true
 		outputFolderEntry.OnChanged(func(e *ui.Entry) {
 			canOverrideOutputFolder = e.Text() == ""
@@ -65,8 +62,8 @@ func run() error {
 		})
 
 		inputBpmEntry := ui.NewEntry()
-		if cliInputs.inputBPM != 0 {
-			inputBpmEntry.SetText(floatToString(cliInputs.inputBPM))
+		if cliInputs.InputBPM != 0 {
+			inputBpmEntry.SetText(floatToString(cliInputs.InputBPM))
 		}
 		loadInputBpmButton := ui.NewButton("load from song info")
 		loadInputBpmButton.OnClicked(func(btn *ui.Button) {
@@ -88,8 +85,8 @@ func run() error {
 		denominator := ui.NewSpinbox(1, math.MaxInt32)
 
 		outputBpmEntry := ui.NewEntry()
-		if cliInputs.outputBPM != 0 {
-			outputBpmEntry.SetText(floatToString(cliInputs.outputBPM))
+		if cliInputs.OutputBPM != 0 {
+			outputBpmEntry.SetText(floatToString(cliInputs.OutputBPM))
 		}
 		loadOutputBpmButton := ui.NewButton("load from output folder")
 		loadOutputBpmButton.OnClicked(func(btn *ui.Button) {
@@ -196,7 +193,8 @@ func run() error {
 				ui.MsgBoxError(window, "processing error", err.Error())
 				return
 			}
-			ui.MsgBox(window, "success", "new beatmaps are in "+inputs.outputFolder)
+			cacheInputs(inputs)
+			ui.MsgBox(window, "success", "new beatmaps are in "+inputs.OutputFolder)
 		})
 		window.OnClosing(func(*ui.Window) bool {
 			ui.Quit()
@@ -208,7 +206,34 @@ func run() error {
 		return err
 	}
 	return nil
-	// return process(inputs)
+}
+
+func cacheInputs(in *inputFields) {
+	fmt.Printf("caching inputs %+v\n", *in)
+	cache := configDirs.QueryCacheFolder()
+	buf, err := json.Marshal(in)
+	if err != nil {
+		fmt.Println("Error marshaling input cache:", err)
+		return
+	}
+	fmt.Printf("marshaled inputs '%s'\n", buf)
+	if err = cache.WriteFile("inputs.json", buf); err != nil {
+		fmt.Println("Error writing cache file:", err)
+	}
+}
+func loadCachedInputs() *inputFields {
+	cache := configDirs.QueryCacheFolder()
+	buf, err := cache.ReadFile("inputs.json")
+	if err != nil {
+		fmt.Println("Error reading input cache file:", err)
+		return &inputFields{}
+	}
+	cachedInputs := &inputFields{}
+	if err = json.Unmarshal(buf, cachedInputs); err != nil {
+		fmt.Println("Error unmarshaling input cache")
+		return &inputFields{}
+	}
+	return cachedInputs
 }
 
 func loadBpmFromFolder(songFolderPath string) (float64, error) {
@@ -244,7 +269,7 @@ func validateInputs(inputSongInfo, outputFolder, inputBPM, outputBPM string) (*i
 	if err := validateSongInfo(inputSongInfo); err != nil {
 		return nil, err
 	}
-	in.inputFolder = filepath.Dir(inputSongInfo)
+	in.InputFolder = filepath.Dir(inputSongInfo)
 
 	if err := os.MkdirAll(outputFolder, 0755); err != nil {
 		return nil, fmt.Errorf("couldn't create output folder '%s': %s", outputFolder, err)
@@ -252,15 +277,15 @@ func validateInputs(inputSongInfo, outputFolder, inputBPM, outputBPM string) (*i
 	if err := validateOutputFolder(outputFolder); err != nil {
 		return nil, err
 	}
-	in.outputFolder = outputFolder
+	in.OutputFolder = outputFolder
 
 	var err error
-	in.inputBPM, err = parsePositiveFloat(inputBPM)
+	in.InputBPM, err = parsePositiveFloat(inputBPM)
 	if err != nil {
 		return nil, fmt.Errorf("input bpm: %s", err)
 	}
 
-	in.outputBPM, err = parsePositiveFloat(outputBPM)
+	in.OutputBPM, err = parsePositiveFloat(outputBPM)
 	if err != nil {
 		return nil, fmt.Errorf("output bpm: %s", err)
 	}
@@ -305,25 +330,25 @@ func ensureFile(path string) error {
 }
 
 func process(inputs *inputFields) error {
-	songInfo, err := loadSongInfo(inputs.inputFolder)
+	songInfo, err := loadSongInfo(inputs.InputFolder)
 	if err != nil {
 		return err
 	}
 
 	for _, difficultyLevel := range songInfo.DifficultyLevels {
-		beatMap, err := loadBeatmap(filepath.Join(inputs.inputFolder, difficultyLevel.JSONPath))
+		beatMap, err := loadBeatmap(filepath.Join(inputs.InputFolder, difficultyLevel.JSONPath))
 		if err != nil {
 			return err
 		}
 		for i, note := range beatMap.Notes {
-			beatMap.Notes[i].Time = convertTimeWithOffset(note.Time, inputs.inputBPM, inputs.outputBPM, difficultyLevel.Offset)
+			beatMap.Notes[i].Time = convertTimeWithOffset(note.Time, inputs.InputBPM, inputs.OutputBPM, difficultyLevel.Offset)
 		}
 		for i, obstacle := range beatMap.Obstacles {
-			beatMap.Obstacles[i].Time = convertTimeWithOffset(obstacle.Time, inputs.inputBPM, inputs.outputBPM, difficultyLevel.Offset)
-			beatMap.Obstacles[i].Duration = convertTime(obstacle.Duration, inputs.inputBPM, inputs.outputBPM)
+			beatMap.Obstacles[i].Time = convertTimeWithOffset(obstacle.Time, inputs.InputBPM, inputs.OutputBPM, difficultyLevel.Offset)
+			beatMap.Obstacles[i].Duration = convertTime(obstacle.Duration, inputs.InputBPM, inputs.OutputBPM)
 		}
-		beatMap.BeatsPerMinute = inputs.outputBPM
-		if err := saveBeatmap(filepath.Join(inputs.outputFolder, difficultyLevel.JSONPath), beatMap); err != nil {
+		beatMap.BeatsPerMinute = inputs.OutputBPM
+		if err := saveBeatmap(filepath.Join(inputs.OutputFolder, difficultyLevel.JSONPath), beatMap); err != nil {
 			return err
 		}
 	}
@@ -366,21 +391,22 @@ func saveBeatmap(filePath string, beatMap *BeatMap) error {
 	return ioutil.WriteFile(filePath, buffer, 0644)
 }
 
-func parseFlags() *inputFields {
+func getInput() *inputFields {
+	cached := loadCachedInputs()
 	in := inputFields{}
-	flag.StringVar(&in.inputFolder, "inputFolder", "", "folder with existing BPM")
-	flag.StringVar(&in.outputFolder, "outputFolder", "", "folder to save new BPM")
-	flag.Float64Var(&in.inputBPM, "inputBPM", 0, "intended initial BPM")
-	flag.Float64Var(&in.outputBPM, "outputBPM", 0, "intended new BPM")
+	flag.StringVar(&in.InputFolder, "inputFolder", cached.InputFolder, "folder with existing BPM")
+	flag.StringVar(&in.OutputFolder, "outputFolder", cached.OutputFolder, "folder to save new BPM")
+	flag.Float64Var(&in.InputBPM, "inputBPM", cached.InputBPM, "intended initial BPM")
+	flag.Float64Var(&in.OutputBPM, "outputBPM", cached.OutputBPM, "intended new BPM")
 	flag.Parse()
 	return &in
 }
 
 type inputFields struct {
-	inputFolder  string
-	outputFolder string
-	inputBPM     float64
-	outputBPM    float64
+	InputFolder  string
+	OutputFolder string
+	InputBPM     float64
+	OutputBPM    float64
 }
 
 type SongInfo struct {
