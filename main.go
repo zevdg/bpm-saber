@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -46,17 +47,50 @@ func run() error {
 		})
 		inputBpmEntry := ui.NewEntry()
 		if cliInputs.inputBPM != 0 {
-			inputBpmEntry.SetText(strconv.FormatFloat(cliInputs.inputBPM, 'f', -1, 64))
+			inputBpmEntry.SetText(floatToString(cliInputs.inputBPM))
 		}
+		loadInputBpmButton := ui.NewButton("load from song info")
+		loadInputBpmButton.OnClicked(func(btn *ui.Button) {
+			bpm, err := loadBpmFromSongInfo(inputFolderEntry.Text())
+			if err != nil {
+				ui.MsgBoxError(window, "error", "couldn't load bpm from song info in directory '"+inputFolderEntry.Text()+"': "+err.Error())
+				return
+			}
+			inputBpmEntry.SetText(floatToString(bpm))
+		})
+
+		multiplyButton := ui.NewButton("=")
+		numerator := ui.NewSpinbox(1, math.MaxInt32)
+		denominator := ui.NewSpinbox(1, math.MaxInt32)
+
 		outputBpmEntry := ui.NewEntry()
 		if cliInputs.outputBPM != 0 {
-			outputBpmEntry.SetText(strconv.FormatFloat(cliInputs.outputBPM, 'f', -1, 64))
+			outputBpmEntry.SetText(floatToString(cliInputs.outputBPM))
 		}
+		loadOutputBpmButton := ui.NewButton("load from song info")
+		loadOutputBpmButton.OnClicked(func(btn *ui.Button) {
+			bpm, err := loadBpmFromSongInfo(outputFolderEntry.Text())
+			if err != nil {
+				ui.MsgBoxError(window, "error", "couldn't load bpm from song info in directory '"+outputFolderEntry.Text()+"': "+err.Error())
+				return
+			}
+			outputBpmEntry.SetText(floatToString(bpm))
+		})
+
+		multiplyButton.OnClicked(func(btn *ui.Button) {
+			inputBPM, err := parsePositiveFloat(inputBpmEntry.Text())
+			if err != nil {
+				ui.MsgBoxError(window, "Error", "invalid input BPM '"+inputBpmEntry.Text()+"'")
+				return
+			}
+			outputBpmEntry.SetText(floatToString(inputBPM * float64(numerator.Value()) / float64(denominator.Value())))
+		})
+
 		button := ui.NewButton("Convert")
 
 		box := ui.NewVerticalBox()
 		box.SetPadded(true)
-		box.Append(ui.NewLabel("All fields are required"), true)
+		box.Append(ui.NewLabel("All fields are required"), false)
 
 		inputFolderBox := ui.NewHorizontalBox()
 		inputFolderBox.SetPadded(true)
@@ -74,23 +108,57 @@ func run() error {
 		outputFolderGroup.SetChild(outputFolderBox)
 		box.Append(outputFolderGroup, false)
 
-		bottomBox := ui.NewHorizontalBox()
-		bottomBox.SetPadded(true)
+		bpmBox := ui.NewHorizontalBox()
+		bpmBox.SetPadded(true)
 
 		inputBpmGroup := ui.NewGroup("input bpm")
-		inputBpmGroup.SetChild(inputBpmEntry)
-		bottomBox.Append(inputBpmGroup, true)
+		inputBpmBox := ui.NewVerticalBox()
+		inputBpmBox.Append(loadInputBpmButton, true)
+		inputBpmBox.Append(inputBpmEntry, false)
+		inputBpmBox.Append(ui.NewLabel(""), true)
+
+		inputBpmGroup.SetChild(inputBpmBox)
+		bpmBox.Append(inputBpmGroup, true)
+
+		calcBox := ui.NewHorizontalBox()
+		calcBox.SetPadded(true)
+
+		crossBox := ui.NewVerticalBox()
+		crossBox.Append(ui.NewLabel(""), true)
+		crossBox.Append(ui.NewLabel("╳"), false)
+		crossBox.Append(ui.NewLabel(""), true)
+		calcBox.Append(crossBox, false)
+
+		multiplyBox := ui.NewVerticalBox()
+		multiplyBox.Append(numerator, false)
+		slashBox := ui.NewVerticalBox()
+		slashBox.Append(ui.NewLabel(""), true)
+		slashBox.Append(ui.NewLabel("━━━━━"), false)
+		slashBox.Append(ui.NewLabel(""), true)
+		middleBox := ui.NewHorizontalBox()
+		middleBox.Append(slashBox, true)
+		middleBox.Append(multiplyButton, false)
+		multiplyBox.Append(middleBox, false)
+		multiplyBox.Append(denominator, true)
+		calcBox.Append(multiplyBox, false)
+		calcGroup := ui.NewGroup("mini calculator")
+		calcGroup.SetChild(calcBox)
+		bpmBox.Append(calcGroup, false)
 
 		outputBpmGroup := ui.NewGroup("output bpm")
-		outputBpmGroup.SetChild(outputBpmEntry)
-		bottomBox.Append(outputBpmGroup, true)
+		outputBpmBox := ui.NewVerticalBox()
+		outputBpmBox.Append(loadOutputBpmButton, true)
+		outputBpmBox.Append(outputBpmEntry, false)
+		outputBpmBox.Append(ui.NewLabel(""), true)
+		outputBpmGroup.SetChild(outputBpmBox)
+		bpmBox.Append(outputBpmGroup, true)
 
-		box.Append(bottomBox, false)
+		box.Append(bpmBox, false)
 
 		buttonsBox := ui.NewHorizontalBox()
 		buttonsBox.SetPadded(true)
 		buttonsBox.Append(button, true)
-		box.Append(buttonsBox, false)
+		box.Append(buttonsBox, true)
 
 		window.SetMargined(true)
 		window.SetChild(box)
@@ -119,6 +187,17 @@ func run() error {
 	// return process(inputs)
 }
 
+func loadBpmFromSongInfo(songFolderPath string) (float64, error) {
+	if err := ensureDir(songFolderPath); err != nil {
+		return 0, err
+	}
+	info, err := loadSongInfo(songFolderPath)
+	if err != nil {
+		return 0, err
+	}
+	return info.BeatsPerMinute, nil
+}
+
 func validateInputs(inputFolder, outputFolder, inputBPM, outputBPM string) (*inputFields, error) {
 	in := &inputFields{}
 	if err := ensureDir(inputFolder); err != nil {
@@ -135,22 +214,31 @@ func validateInputs(inputFolder, outputFolder, inputBPM, outputBPM string) (*inp
 	in.outputFolder = outputFolder
 
 	var err error
-	in.inputBPM, err = strconv.ParseFloat(inputBPM, 64)
+	in.inputBPM, err = parsePositiveFloat(inputBPM)
 	if err != nil {
 		return nil, fmt.Errorf("input bpm: %s", err)
 	}
-	if in.inputBPM <= 0 {
-		return nil, errors.New("input bpm: must be > 0")
-	}
 
-	in.outputBPM, err = strconv.ParseFloat(outputBPM, 64)
+	in.outputBPM, err = parsePositiveFloat(outputBPM)
 	if err != nil {
 		return nil, fmt.Errorf("output bpm: %s", err)
 	}
-	if in.outputBPM <= 0 {
-		return nil, errors.New("output bpm: must be > 0")
-	}
 	return in, nil
+}
+
+func floatToString(val float64) string {
+	return strconv.FormatFloat(val, 'f', -1, 64)
+}
+
+func parsePositiveFloat(input string) (float64, error) {
+	val, err := strconv.ParseFloat(input, 64)
+	if err != nil {
+		return 0, err
+	}
+	if val <= 0 {
+		return 0, errors.New("input bpm: must be > 0")
+	}
+	return val, nil
 }
 
 func ensureDir(path string) error {
@@ -165,7 +253,7 @@ func ensureDir(path string) error {
 }
 
 func process(inputs *inputFields) error {
-	songInfo, err := loadSongInfo(filepath.Join(inputs.inputFolder, "info.json"))
+	songInfo, err := loadSongInfo(inputs.inputFolder)
 	if err != nil {
 		return err
 	}
@@ -200,7 +288,8 @@ func convertTime(oldTime, inputBPM, outputBPM float64) float64 {
 	return oldTime * outputBPM / inputBPM
 }
 
-func loadSongInfo(filePath string) (*SongInfo, error) {
+func loadSongInfo(folderPath string) (*SongInfo, error) {
+	filePath := filepath.Join(folderPath, "info.json")
 	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
