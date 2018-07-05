@@ -22,13 +22,13 @@ func main() {
 	}
 }
 
-var configDirs = configdir.New("", "meter-saber")
+var configDirs = configdir.New("", "bpm-saber")
 
 func run() error {
 	cliInputs := getInput()
 
 	err := ui.Main(func() {
-		window := ui.NewWindow("MeterSaber", 1200, 100, false)
+		window := ui.NewWindow("Beat Saber BPM Changer", 1200, 100, false)
 
 		inputSongInfoEntry := ui.NewEntry()
 		if cliInputs.InputFolder != "" {

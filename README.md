@@ -1,6 +1,6 @@
-# meter-saber
+# Beat Saber BPM Changer
 
-for changing the BPM of a beatsaber track without changing the relative position of the boxes and walls. This is particularly useful for making 6/8 songs, but maybe useful for other purposes.
+A tool for changing the BPM of a beatsaber track without changing the relative position of the boxes and walls. This is particularly useful for making 6/8 songs, but maybe useful for other purposes.
 
 ![screenshot](./screenshot.png)
 
