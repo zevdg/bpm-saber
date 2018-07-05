@@ -4,11 +4,11 @@ A tool for changing the BPM of a beatsaber track without changing the relative p
 
 ![screenshot](./screenshot.png)
 
-In the screenshot above, I am creating a beatmap for "Over The Hills And Far Away" by Nightwish. This song has a BPM of 135.75 and is in 6/8. Since edit-saber does not yet support 6/8 songs, I had to edit the song in 407.25 BPM (3x the true BPM). This works, but caused the boxes to come at you much faster in game than they should. This program fixes that problem by converting the BPM back to the correct tempo and the adjusting all the boxes and walls back to their correct position within the song.
+In the screenshot above, I am creating a beatmap for a song in 6/8 with a BPM of 120. Since EditSaber doesn't support 6/8 songs yet, I had to edit the song in 360 BPM (3x the true BPM). This works, but causes the boxes to come at you much faster in game than they should. Bpm-saber fixes that problem by converting the BPM back to the correct tempo and the adjusting all the boxes and walls back to their correct position within the song.
 
 This tool only creates the `DIFFICULTY_LEVEL.json` files in the output folder. You will have to copy over the other files (info.json, song.ogg, cover.jpg, etc.) yourself.
 
-## description of sections
+## Description of sections
 
 ### input song info.json
 
