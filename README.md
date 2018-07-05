@@ -32,3 +32,8 @@ This value can be derived from the input BPM using the built-in calculator, load
 ### built-in calculator
 
 If you know what output BPM you want, you can totally ignore this section. It is only provided for convenience. see the "output bpm" section for more details.
+
+## Related tools
+
+Apparently someone had already made a python script that does basically the same thing but without a GUI.  
+You can find it here https://discordapp.com/channels/441805394323439646/443569023951568906/459771392054001666
