@@ -9,6 +9,12 @@ In the screenshot above, I am creating a beatmap for a song in 6/8 with a BPM of
 
 This tool only creates the `DIFFICULTY_LEVEL.json` files in the output folder. You will have to copy over the other files (info.json, song.ogg, cover.jpg, etc.) yourself.
 
+## Installation
+Simply download and run bpm-saber.exe from the [releases page](https://github.com/zevdg/bpm-saber/releases).  
+
+_Linux and mac builds are also available on that page.  
+The mac build is untested but should work._
+
 ## Description of sections
 
 ### input song info.json
